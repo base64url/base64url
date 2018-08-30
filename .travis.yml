@@ -1,0 +1,14 @@
+language: go
+sudo: false
+matrix:
+  include:
+    - go: "1.x"
+
+before_install:
+  - go get github.com/mitchellh/gox
+
+install:
+  - # skip
+
+script:
+  - gox -os="linux darwin windows" -arch="amd64" -output="base64url.." -ldflags "-X main.Rev=`git rev-parse --short HEAD`" -verbose ./...
