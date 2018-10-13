@@ -5,9 +5,8 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
+	"io"
 )
 
 type flags struct {
@@ -30,15 +29,24 @@ func main() {
 		os.Exit(0)
 	}
 
-	input := readInput()
-
+	input := getInputReader()
+	
 	if cmd.decode {
-		output, err := base64.RawURLEncoding.DecodeString(input)
+		// Manually remove newline chars \r and \n before decoding - otherwise the decoder will throw an error
+		remover := NewNewlineRemovingReader(input)
+		decoder := base64.NewDecoder(base64.RawURLEncoding, remover)
+		_, err := io.Copy(os.Stdout, decoder)
 		checkError(err)
-		fmt.Print(string(output))
 	} else {
-		output := base64.RawURLEncoding.EncodeToString([]byte(input))
-		fmt.Print(output)
+		scanner := bufio.NewScanner(input)
+		scanner.Split(bufio.ScanLines)
+		encoder := base64.NewEncoder(base64.RawURLEncoding, os.Stdout)
+		for scanner.Scan() {
+			_, err := encoder.Write(scanner.Bytes())
+			checkError(err)
+		}
+		encoder.Close()
+		checkError(scanner.Err())
 	}
 }
 
@@ -46,29 +54,25 @@ func checkError(err error) {
 	if err != nil {
 		if cmd.verbose {
 			fmt.Print("Error: ")
-			fmt.Println(err.Error())
+			fmt.Fprintln(os.Stderr, err.Error())
 		}
 		os.Exit(1)
 	}
 }
 
-func readInput() string {
+func getInputReader() io.Reader {
 	args := flag.Args()
-	input := ""
 	if len(args) > 1 {
 		fmt.Println("too many arguments")
 		os.Exit(1)
 	} else if len(args) == 0 || args[0] == "-" {
-		reader := bufio.NewReader(os.Stdin)
-		var err error
-		input, err = reader.ReadString('\n')
-		checkError(err)
+		return bufio.NewReader(os.Stdin)
 	} else {
-		file, err := ioutil.ReadFile(args[0])
+		reader, err := os.Open(args[0])
 		checkError(err)
-		input = string(file)
+		return reader
 	}
-	return strings.Trim(input, " \r\n")
+	return nil
 }
 
 func parseCommandLine() {
