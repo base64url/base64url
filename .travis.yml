@@ -12,3 +12,13 @@ install:
 
 script:
   - gox -os="linux darwin windows" -arch="amd64" -output="base64url.." -ldflags "-X main.Rev=`git rev-parse --short HEAD`" -verbose ./...
+
+deploy:
+  provider: releases
+  api_key:
+    secure: $GITHUB_OAUTH_TOKEN
+  file_glob: true
+  file: directory/**/*/base64url*
+  skip_cleanup: true
+  on:
+    tags: true
