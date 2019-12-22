@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"os"
 	"io"
+	"os"
 )
 
 type flags struct {
@@ -16,8 +16,28 @@ type flags struct {
 }
 
 var cmd flags
-var Version string = "0.0.1"
-var Rev string = ""
+var version string = "0.0.1"
+var rev string = ""
+
+func decode(inStream io.Reader, outStream io.Writer) error {
+	// Manually remove newline chars \r and \n before decoding - otherwise the decoder will throw an error
+	remover := newNewlineRemovingReader(inStream)
+	decoder := base64.NewDecoder(base64.RawURLEncoding, remover)
+	_, err := io.Copy(outStream, decoder)
+	return err
+}
+
+func encode(inStream io.Reader, outStream io.Writer) error {
+	scanner := bufio.NewScanner(inStream)
+	scanner.Split(bufio.ScanLines)
+	encoder := base64.NewEncoder(base64.RawURLEncoding, outStream)
+	for scanner.Scan() {
+		_, err := encoder.Write(scanner.Bytes())
+		checkError(err)
+	}
+	encoder.Close()
+	return scanner.Err()
+}
 
 func main() {
 	flag.Usage = printHelp
@@ -30,23 +50,13 @@ func main() {
 	}
 
 	input := getInputReader()
-	
+
 	if cmd.decode {
-		// Manually remove newline chars \r and \n before decoding - otherwise the decoder will throw an error
-		remover := NewNewlineRemovingReader(input)
-		decoder := base64.NewDecoder(base64.RawURLEncoding, remover)
-		_, err := io.Copy(os.Stdout, decoder)
+		err := decode(input, os.Stdout)
 		checkError(err)
 	} else {
-		scanner := bufio.NewScanner(input)
-		scanner.Split(bufio.ScanLines)
-		encoder := base64.NewEncoder(base64.RawURLEncoding, os.Stdout)
-		for scanner.Scan() {
-			_, err := encoder.Write(scanner.Bytes())
-			checkError(err)
-		}
-		encoder.Close()
-		checkError(scanner.Err())
+		err := encode(input, os.Stdout)
+		checkError(err)
 	}
 }
 
@@ -95,5 +105,5 @@ func printHelp() {
 
 func printVersion() {
 	fmt.Println("base64url - base64 encode/decode data and print to standard output using the URL and Filename Safe Alphabet.")
-	fmt.Println("Version " + Version + " " + Rev)
+	fmt.Println("Version " + version + " " + rev)
 }

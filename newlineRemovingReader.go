@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"io"
 )
 
@@ -8,15 +9,15 @@ type newlineRemovingReader struct {
 	reader io.Reader
 }
 
-func NewNewlineRemovingReader(reader io.Reader) *newlineRemovingReader {
+func newNewlineRemovingReader(reader io.Reader) *newlineRemovingReader {
 	return &newlineRemovingReader{reader: reader}
 }
 
-func isNewline(r byte) byte {
-	if (r == '\n' || r == '\r') {
-		return 0
+func isNotNewline(r byte) bool {
+	if r == '\n' || r == '\r' {
+		return false
 	}
-	return r
+	return true
 }
 
 func (a *newlineRemovingReader) Read(p []byte) (int, error) {
@@ -25,14 +26,15 @@ func (a *newlineRemovingReader) Read(p []byte) (int, error) {
 		return n, err
 	}
 	read := 0
-	buf := make([]byte, n)
+	buf := new(bytes.Buffer)
+
 	for i := 0; i < n; i++ {
-		if char := isNewline(p[i]); char != 0 {
-			buf[i] = char
+		if isNotNewline(p[i]) {
+			buf.WriteByte(p[i])
 			read++
 		}
 	}
 
-	copy(p, buf)
-	return read - 1, nil
+	copy(p, buf.Bytes())
+	return read, nil
 }
